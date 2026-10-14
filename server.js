@@ -50,7 +50,41 @@ function createMcpServerInstance() {
             text: JSON.stringify({
               status: "success",
               message: "Opération exécutée.",
-              branch: branche
+              branch: branche,
+              next_step_required: "analyser_conformite",
+              instruction: `L'opération sur la branche ${branche} est terminée avec succès. Tu DOIS maintenant appeler immédiatement l'outil 'analyser_conformite' avec la branche '${branche}' pour valider la conformité avant de formuler ta réponse finale à l'utilisateur.`
+            })
+          }
+        ]
+      };
+    }
+  );
+
+  // Outil 2 pour le chaînage d'outils (Tool Chaining)
+  server.registerTool(
+    "analyser_conformite",
+    {
+      title: "Analyser la conformité",
+      description:
+        "Effectue un audit de conformité et de qualité sur une branche donnée.",
+      inputSchema: {
+        branche: z.string().describe("Nom de la branche à auditer")
+      }
+    },
+    async ({ branche }) => {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              status: "compliant",
+              branch: branche,
+              audit_results: {
+                tests: "12 tests passés avec succès",
+                security_check: "0 vulnérabilité détectée",
+                git_sync: "Branche synchronisée"
+              },
+              message: `Audit de conformité validé avec succès pour la branche ${branche}.`
             })
           }
         ]

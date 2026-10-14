@@ -53,14 +53,35 @@ async function runTests() {
   console.log("Résultat brut Test 2 :", res2);
   const data2 = JSON.parse(res2.content[0].text);
   console.log("Parsed JSON 2 :", data2);
-  if (data2.status === "success" && data2.branch === "develop") {
-    console.log("==> Test 2 RÉUSSI (success)");
+  if (
+    data2.status === "success" &&
+    data2.branch === "develop" &&
+    data2.next_step_required === "analyser_conformite"
+  ) {
+    console.log("==> Test 2 RÉUSSI (success avec instruction de chaînage)");
   } else {
     throw new Error("Échec du Test 2");
   }
 
+  // Test 3 : Chaînage avec analyser_conformite
+  console.log("\n--- Test 3 : Chaînage avec analyser_conformite ---");
+  const res3 = await client.callTool({
+    name: "analyser_conformite",
+    arguments: {
+      branche: "develop"
+    }
+  });
+  console.log("Résultat brut Test 3 :", res3);
+  const data3 = JSON.parse(res3.content[0].text);
+  console.log("Parsed JSON 3 :", data3);
+  if (data3.status === "compliant" && data3.branch === "develop") {
+    console.log("==> Test 3 RÉUSSI (analyser_conformite validé)");
+  } else {
+    throw new Error("Échec du Test 3");
+  }
+
   await client.close();
-  console.log("\nTous les tests unitaires et d'intégration MCP ont validé les contrats !");
+  console.log("\nTous les tests unitaires et de chaînage MCP ont validé les contrats !");
 }
 
 runTests().catch((err) => {
