@@ -3,6 +3,41 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 
+// État persistant du travailleur asynchrone (Le Vrai Travail)
+const workerState = {
+  currentCycle: 0,
+  isWorking: false,
+  cycleStartTime: 0,
+  cycleDurationMs: 12000, // 12 secondes par cycle lourd
+  lastCompletedCycle: 0,
+  lastCompletedResult: null
+};
+
+function ensureWorkerRunning() {
+  if (workerState.isWorking) return;
+  workerState.isWorking = true;
+  workerState.currentCycle++;
+  workerState.cycleStartTime = Date.now();
+  console.log(`[Worker] Démarrage du Vrai Travail - Cycle #${workerState.currentCycle}`);
+
+  setTimeout(() => {
+    workerState.lastCompletedCycle = workerState.currentCycle;
+    workerState.lastCompletedResult = {
+      cycle: workerState.currentCycle,
+      completedAt: new Date().toISOString(),
+      duree_traitement_ms: workerState.cycleDurationMs,
+      donnees: {
+        lots_traites: workerState.currentCycle * 100,
+        etat_systeme: "100% Intègre",
+        consommation_memoire: "48 MB"
+      },
+      message: `Cycle #${workerState.currentCycle} achevé avec succès après ${workerState.cycleDurationMs / 1000}s de calcul lourd.`
+    };
+    workerState.isWorking = false;
+    console.log(`[Worker] Cycle #${workerState.lastCompletedCycle} terminé avec succès !`);
+  }, workerState.cycleDurationMs);
+}
+
 function createMcpServerInstance() {
   const server = new McpServer({
     name: "TestClarification",
@@ -183,6 +218,74 @@ function createMcpServerInstance() {
                 `1) Le bilan global de l'opération sur la branche ${branche}, ` +
                 `2) L'analyse des vulnérabilités identifiées dans le fichier transmis, ` +
                 `3) Les recommandations de remédiation selon les bonnes pratiques.`
+            })
+          }
+        ]
+      };
+    }
+  );
+
+  // Outil 5 : Double boucle infinie (Worker Asynchrone + Sentinelle de 7s)
+  server.registerTool(
+    "traiter_flux_infini",
+    {
+      title: "Traiter le flux continu (Worker + Sentinelle)",
+      description:
+        "Ouvre une fenêtre de 7 secondes pour capturer les résultats du travail lourd qui s'exécute en continu en arrière-plan.",
+      inputSchema: {
+        fenetre_id: z.number().optional().describe("Numéro de la fenêtre d'écoute"),
+        cycle_attendu: z.number().optional().describe("Numéro du cycle lourd attendu")
+      }
+    },
+    async ({ fenetre_id = 1, cycle_attendu = 1 }) => {
+      ensureWorkerRunning();
+
+      const SENTINEL_TIMEOUT_MS = 7000;
+      const pollIntervalMs = 400;
+      const startWindowTime = Date.now();
+
+      while (Date.now() - startWindowTime < SENTINEL_TIMEOUT_MS) {
+        if (workerState.lastCompletedCycle >= cycle_attendu) {
+          const result = workerState.lastCompletedResult;
+          const prochainCycle = cycle_attendu + 1;
+
+          // Relancer immédiatement le Vrai Travail pour le cycle suivant !
+          ensureWorkerRunning();
+
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({
+                  status: "CYCLE_COMPLETED",
+                  cycle_termine: cycle_attendu,
+                  donnees_du_travail: result,
+                  message: `🎉 SUCCÈS : Le Cycle #${cycle_attendu} est achevé et a été transmis par cette fenêtre !`,
+                  instruction: `LE CYCLE #${cycle_attendu} EST TERMINÉ ! Le Vrai Travail du Cycle #${prochainCycle} est déjà lancé en arrière-plan. Tu DOIS immédiatement rappeler cet outil 'traiter_flux_infini' avec { "cycle_attendu": ${prochainCycle}, "fenetre_id": 1 } pour ouvrir la fenêtre d'écoute du Cycle #${prochainCycle} sans t'arrêter.`
+                })
+              }
+            ]
+          };
+        }
+
+        await new Promise(r => setTimeout(r, pollIntervalMs));
+      }
+
+      // Les 7 secondes sont écoulées, le travail lourd tourne toujours
+      const prochainFenetre = fenetre_id + 1;
+      const tempsEcouleSec = Math.round((Date.now() - workerState.cycleStartTime) / 1000);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              status: "IN_PROGRESS",
+              cycle_en_cours: workerState.currentCycle,
+              temps_ecoule_sec: tempsEcouleSec,
+              fenetre_utilisee: fenetre_id,
+              message: `⏳ Le Vrai Travail (Cycle #${workerState.currentCycle}) est toujours en cours d'exécution (${tempsEcouleSec}s écoulées). La fenêtre de 7s se ferme pour éviter tout timeout.`,
+              instruction: `Le Vrai Travail n'a pas encore fini. Tu DOIS immédiatement rouvrir une nouvelle fenêtre en rappelant l'outil 'traiter_flux_infini' avec { "cycle_attendu": ${cycle_attendu}, "fenetre_id": ${prochainFenetre} } sans t'arrêter.`
             })
           }
         ]

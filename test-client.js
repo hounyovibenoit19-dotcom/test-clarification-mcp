@@ -134,8 +134,30 @@ async function runTests() {
     throw new Error("Échec du Test 5");
   }
 
+  // Test 6 : Sentinelle de flux infini avec traiter_flux_infini
+  console.log("\n--- Test 6 : Sentinelle et Worker (traiter_flux_infini) ---");
+  console.log("Ouverture de la fenêtre sentinelle de 7 secondes...");
+  const res6 = await client.callTool({
+    name: "traiter_flux_infini",
+    arguments: {
+      fenetre_id: 1,
+      cycle_attendu: 1
+    }
+  });
+  console.log("Résultat brut Test 6 :", res6);
+  const data6 = JSON.parse(res6.content[0].text);
+  console.log("Parsed JSON 6 :", data6);
+  if (
+    (data6.status === "IN_PROGRESS" || data6.status === "CYCLE_COMPLETED") &&
+    data6.instruction.includes("traiter_flux_infini")
+  ) {
+    console.log("==> Test 6 RÉUSSI (Sentinelle et consigne de relance validées)");
+  } else {
+    throw new Error("Échec du Test 6");
+  }
+
   await client.close();
-  console.log("\nLa chaîne complète des 4 outils MCP est 100% validée !");
+  console.log("\nTous les tests MCP (incluant le flux infini) sont 100% validés !");
 }
 
 runTests().catch((err) => {
