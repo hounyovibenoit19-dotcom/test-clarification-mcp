@@ -149,9 +149,10 @@ async function runTests() {
   console.log("Parsed JSON 6 :", data6);
   if (
     (data6.status === "IN_PROGRESS" || data6.status === "CYCLE_COMPLETED") &&
+    data6.reponse_finale_recue === false &&
     data6.instruction.includes("traiter_flux_infini")
   ) {
-    console.log("==> Test 6 RÉUSSI (Sentinelle et consigne de relance validées)");
+    console.log("==> Test 6 RÉUSSI (Sentinelle, reponse_finale_recue: false et consigne validées)");
   } else {
     throw new Error("Échec du Test 6");
   }

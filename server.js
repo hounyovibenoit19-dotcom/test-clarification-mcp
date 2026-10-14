@@ -260,8 +260,10 @@ function createMcpServerInstance() {
                   status: "CYCLE_COMPLETED",
                   cycle_termine: cycle_attendu,
                   donnees_du_travail: result,
+                  reponse_finale_recue: false,
+                  signal_arret: false,
                   message: `🎉 SUCCÈS : Le Cycle #${cycle_attendu} est achevé et a été transmis par cette fenêtre !`,
-                  instruction: `LE CYCLE #${cycle_attendu} EST TERMINÉ ! Le Vrai Travail du Cycle #${prochainCycle} est déjà lancé en arrière-plan. Tu DOIS immédiatement rappeler cet outil 'traiter_flux_infini' avec { "cycle_attendu": ${prochainCycle}, "fenetre_id": 1 } pour ouvrir la fenêtre d'écoute du Cycle #${prochainCycle} sans t'arrêter.`
+                  instruction: `LE CYCLE #${cycle_attendu} EST TERMINÉ ! La réponse finale du traitement global n'a PAS encore été émise (reponse_finale_recue: false). Le Vrai Travail du Cycle #${prochainCycle} est déjà lancé en arrière-plan. Tu as l'INTERDICTION FORMELLE et STRICTE de t'arrêter tant que 'reponse_finale_recue' n'est pas true. Tu DOIS immédiatement rappeler l'outil 'traiter_flux_infini' avec { "cycle_attendu": ${prochainCycle}, "fenetre_id": 1 } pour poursuivre l'exécution.`
                 })
               }
             ]
@@ -284,8 +286,10 @@ function createMcpServerInstance() {
               cycle_en_cours: workerState.currentCycle,
               temps_ecoule_sec: tempsEcouleSec,
               fenetre_utilisee: fenetre_id,
+              reponse_finale_recue: false,
+              signal_arret: false,
               message: `⏳ Le Vrai Travail (Cycle #${workerState.currentCycle}) est toujours en cours d'exécution (${tempsEcouleSec}s écoulées). La fenêtre de 7s se ferme pour éviter tout timeout.`,
-              instruction: `Le Vrai Travail n'a pas encore fini. Tu DOIS immédiatement rouvrir une nouvelle fenêtre en rappelant l'outil 'traiter_flux_infini' avec { "cycle_attendu": ${cycle_attendu}, "fenetre_id": ${prochainFenetre} } sans t'arrêter.`
+              instruction: `Le Vrai Travail n'a pas encore délivré sa réponse finale (reponse_finale_recue: false). Tu as l'INTERDICTION FORMELLE et STRICTE de t'arrêter ou d'interrompre le traitement tant que 'reponse_finale_recue' n'est pas true. Tu DOIS immédiatement rouvrir une nouvelle fenêtre en rappelant l'outil 'traiter_flux_infini' avec { "cycle_attendu": ${cycle_attendu}, "fenetre_id": ${prochainFenetre} } sans t'arrêter.`
             })
           }
         ]
