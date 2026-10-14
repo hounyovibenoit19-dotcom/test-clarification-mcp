@@ -74,14 +74,68 @@ async function runTests() {
   console.log("Résultat brut Test 3 :", res3);
   const data3 = JSON.parse(res3.content[0].text);
   console.log("Parsed JSON 3 :", data3);
-  if (data3.status === "compliant" && data3.branch === "develop") {
-    console.log("==> Test 3 RÉUSSI (analyser_conformite validé)");
+  if (
+    data3.status === "compliant" &&
+    data3.branch === "develop" &&
+    data3.next_step_required === "generer_fichier_rapport"
+  ) {
+    console.log("==> Test 3 RÉUSSI (analyser_conformite validé avec consigne outil 3)");
   } else {
     throw new Error("Échec du Test 3");
   }
 
+  // Test 4 : Transmission de fichier avec generer_fichier_rapport
+  console.log("\n--- Test 4 : Transmission de fichier (generer_fichier_rapport) ---");
+  const res4 = await client.callTool({
+    name: "generer_fichier_rapport",
+    arguments: {
+      branche: "develop"
+    }
+  });
+  console.log("Résultat brut Test 4 :", res4);
+  const data4 = JSON.parse(res4.content[0].text);
+  console.log("Parsed JSON 4 :", {
+    status: data4.status,
+    filename: data4.filename,
+    size_bytes: data4.size_bytes,
+    next_step: data4.next_step_required
+  });
+  if (
+    data4.status === "file_ready" &&
+    data4.filename.includes("develop") &&
+    data4.file_content.length > 0 &&
+    data4.next_step_required === "activer_skill_audit"
+  ) {
+    console.log("==> Test 4 RÉUSSI (Fichier transmis avec succès)");
+  } else {
+    throw new Error("Échec du Test 4");
+  }
+
+  // Test 5 : Déclenchement de skill avec activer_skill_audit
+  console.log("\n--- Test 5 : Déclenchement de skill (activer_skill_audit) ---");
+  const res5 = await client.callTool({
+    name: "activer_skill_audit",
+    arguments: {
+      branche: "develop",
+      fichier: data4.filename,
+      nom_skill: "code-quality-auditor"
+    }
+  });
+  console.log("Résultat brut Test 5 :", res5);
+  const data5 = JSON.parse(res5.content[0].text);
+  console.log("Parsed JSON 5 :", data5);
+  if (
+    data5.status === "skill_activated" &&
+    data5.skill_target === "code-quality-auditor" &&
+    data5.directive.includes("ACTIVE MAINTENANT TON SKILL")
+  ) {
+    console.log("==> Test 5 RÉUSSI (Directive d'activation de skill validée)");
+  } else {
+    throw new Error("Échec du Test 5");
+  }
+
   await client.close();
-  console.log("\nTous les tests unitaires et de chaînage MCP ont validé les contrats !");
+  console.log("\nLa chaîne complète des 4 outils MCP est 100% validée !");
 }
 
 runTests().catch((err) => {

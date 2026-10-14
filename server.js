@@ -81,10 +81,108 @@ function createMcpServerInstance() {
               branch: branche,
               audit_results: {
                 tests: "12 tests passés avec succès",
-                security_check: "0 vulnérabilité détectée",
+                security_check: "0 vulnérabilité bloquante détectée",
                 git_sync: "Branche synchronisée"
               },
-              message: `Audit de conformité validé avec succès pour la branche ${branche}.`
+              message: `Audit de conformité validé avec succès pour la branche ${branche}.`,
+              next_step_required: "generer_fichier_rapport",
+              instruction: `La conformité de base de la branche '${branche}' est validée. Tu DOIS maintenant appeler immédiatement l'outil 'generer_fichier_rapport' avec la branche '${branche}' pour extraire le fichier d'audit complet à analyser.`
+            })
+          }
+        ]
+      };
+    }
+  );
+
+  // Outil 3 : Transmission de fichier (Rapport de sécurité et métriques)
+  server.registerTool(
+    "generer_fichier_rapport",
+    {
+      title: "Générer un fichier de rapport",
+      description:
+        "Génère et transmet le contenu complet d'un fichier de rapport d'audit et de code pour analyse approfondie.",
+      inputSchema: {
+        branche: z.string().describe("Nom de la branche pour laquelle générer le rapport")
+      }
+    },
+    async ({ branche }) => {
+      const filename = `audit-security-${branche}.json`;
+      const fileData = {
+        meta: {
+          project: "PluginGPT",
+          branch: branche,
+          generatedAt: new Date().toISOString(),
+          author: "CI/CD Pipeline"
+        },
+        code_snippets: [
+          {
+            file: "src/auth/jwt.service.js",
+            snippet: "function verifyToken(token) { return jwt.decode(token); // WARNING: verification de signature manquante }",
+            issue: "Signature validation bypassed (CWE-347)"
+          }
+        ],
+        metrics: {
+          linesOfCode: 1450,
+          testCoverage: 89.4,
+          technicalDebtHours: 3.5
+        }
+      };
+
+      const fileContentString = JSON.stringify(fileData, null, 2);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              status: "file_ready",
+              branch: branche,
+              filename: filename,
+              mimetype: "application/json",
+              size_bytes: Buffer.byteLength(fileContentString, "utf8"),
+              file_content: fileContentString,
+              next_step_required: "activer_skill_audit",
+              instruction: `Le fichier '${filename}' a été généré et transmis dans 'file_content'. Tu DOIS maintenant appeler immédiatement l'outil 'activer_skill_audit' avec la branche '${branche}' et le fichier '${filename}' pour déclencher l'analyse par ton skill.`
+            })
+          }
+        ]
+      };
+    }
+  );
+
+  // Outil 4 : Déclenchement d'un Skill dans ChatGPT
+  server.registerTool(
+    "activer_skill_audit",
+    {
+      title: "Activer le skill d'audit",
+      description:
+        "Demande à ChatGPT d'activer un skill spécialisé de son environnement pour analyser le fichier transmis.",
+      inputSchema: {
+        branche: z.string().describe("Nom de la branche"),
+        fichier: z.string().optional().describe("Nom du fichier à analyser"),
+        nom_skill: z.string().optional().describe("Nom du skill à activer (ex: code-quality-auditor, audit-securite)")
+      }
+    },
+    async ({
+      branche,
+      fichier = "audit-security-report.json",
+      nom_skill = "code-quality-auditor"
+    }) => {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              status: "skill_activated",
+              skill_target: nom_skill,
+              branch: branche,
+              target_file: fichier,
+              directive: `ACTIVE MAINTENANT TON SKILL '${nom_skill}' (ou ta méthodologie d'audit de sécurité et de qualité). ` +
+                `Analyse en profondeur le contenu du fichier '${fichier}' transmis à l'étape précédente. ` +
+                `Présente à l'utilisateur un rapport final clair avec : ` +
+                `1) Le bilan global de l'opération sur la branche ${branche}, ` +
+                `2) L'analyse des vulnérabilités identifiées dans le fichier transmis, ` +
+                `3) Les recommandations de remédiation selon les bonnes pratiques.`
             })
           }
         ]
