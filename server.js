@@ -297,6 +297,118 @@ function createMcpServerInstance() {
     }
   );
 
+  // Outil 6 : Inversion de contrôle via MCP Sampling (createMessage)
+  server.registerTool(
+    "auditer_snippet_avec_sampling",
+    {
+      title: "Auditer un snippet via MCP Sampling (Inversion de contrôle)",
+      description:
+        "Démontre le MCP Sampling : le serveur MCP interroge lui-même le LLM du client via sampling/createMessage pour lui faire analyser un snippet de code sans clé API côté serveur.",
+      inputSchema: {
+        code_snippet: z
+          .string()
+          .describe("Le snippet de code à faire analyser par le LLM du client"),
+        question: z
+          .string()
+          .optional()
+          .describe("Consigne ou question posée au LLM par le serveur")
+      }
+    },
+    async ({
+      code_snippet,
+      question = "Analyse la sécurité et la robustesse de ce code, et propose une correction si nécessaire."
+    }) => {
+      const clientCaps = server.server.getClientCapabilities();
+      const hasSampling = Boolean(clientCaps && clientCaps.sampling);
+
+      if (!hasSampling) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  status: "sampling_not_supported_by_client",
+                  message:
+                    "Le client MCP connecté n'a pas déclaré la capacité 'sampling'.",
+                  client_capabilities: clientCaps || {},
+                  code_recu: code_snippet,
+                  explication:
+                    "Le MCP Sampling requiert un client compatible qui déclare 'sampling: {}' lors de l'initialisation MCP. Si vous utilisez ChatGPT Web, le sampling client-side n'est pas encore exposé. Si vous utilisez Claude Desktop ou Claude Code, vérifiez que le client autorise le sampling."
+                },
+                null,
+                2
+              )
+            }
+          ]
+        };
+      }
+
+      try {
+        const response = await server.server.createMessage({
+          messages: [
+            {
+              role: "user",
+              content: {
+                type: "text",
+                text: `${question}\n\nSnippet de code soumis par le serveur :\n\`\`\`javascript\n${code_snippet}\n\`\`\``
+              }
+            }
+          ],
+          systemPrompt:
+            "Tu es un expert en sécurité logicielle exécuté à travers le mécanisme de MCP Sampling d'un serveur distant.",
+          maxTokens: 600
+        });
+
+        const texteGenere =
+          response.content?.text ||
+          (Array.isArray(response.content)
+            ? response.content.map((c) => c.text).join("\n")
+            : JSON.stringify(response.content));
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  status: "sampling_success",
+                  message:
+                    "🎉 SUCCÈS SAMPLING : Le serveur MCP a interrogé avec succès le LLM du client !",
+                  modele_utilise_par_client: response.model,
+                  role: response.role,
+                  reponse_du_llm: texteGenere,
+                  raw_response: response
+                },
+                null,
+                2
+              )
+            }
+          ]
+        };
+      } catch (err) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  status: "sampling_error",
+                  message:
+                    "Erreur lors de la requête sampling/createMessage au client : " +
+                    err.message,
+                  details: err.stack || err.toString()
+                },
+                null,
+                2
+              )
+            }
+          ]
+        };
+      }
+    }
+  );
+
   return server;
 }
 

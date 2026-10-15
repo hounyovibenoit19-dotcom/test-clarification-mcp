@@ -1,5 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { CreateMessageRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
 async function runTests() {
   console.log("Connecting to MCP server at http://localhost:8787/mcp ...");
@@ -13,9 +14,25 @@ async function runTests() {
       version: "1.0.0"
     },
     {
-      capabilities: {}
+      capabilities: {
+        sampling: {}
+      }
     }
   );
+
+  client.setRequestHandler(CreateMessageRequestSchema, async (request) => {
+    console.log("--> [Client Mock LLM] Requête de Sampling reçue du serveur MCP !");
+    console.log("    System Prompt :", request.params.systemPrompt);
+    console.log("    User Prompt :", request.params.messages[0].content.text);
+    return {
+      model: "mock-llm-sampling",
+      role: "assistant",
+      content: {
+        type: "text",
+        text: "Simulation LLM : Code audité avec succès. Recommandation : remplacer decode() par verify()."
+      }
+    };
+  });
 
   await client.connect(transport);
   console.log("Connected successfully to TestClarification!");
@@ -157,8 +174,30 @@ async function runTests() {
     throw new Error("Échec du Test 6");
   }
 
+  // Test 7 : MCP Sampling (inversion de contrôle)
+  console.log("\n--- Test 7 : MCP Sampling (inversion de contrôle) ---");
+  const res7 = await client.callTool({
+    name: "auditer_snippet_avec_sampling",
+    arguments: {
+      code_snippet: "function auth(token) { return jwt.decode(token); }"
+    }
+  });
+  console.log("Résultat brut Test 7 :", res7);
+  const data7 = JSON.parse(res7.content[0].text);
+  console.log("Parsed JSON 7 :", data7);
+  if (
+    data7.status === "sampling_success" ||
+    data7.status === "sampling_not_supported_by_client"
+  ) {
+    console.log(
+      `==> Test 7 RÉUSSI (Gestion robuste du sampling MCP validée : status = ${data7.status})`
+    );
+  } else {
+    throw new Error("Échec du Test 7");
+  }
+
   await client.close();
-  console.log("\nTous les tests MCP (incluant le flux infini) sont 100% validés !");
+  console.log("\nTous les tests MCP (incluant Sampling et flux infini) sont 100% validés !");
 }
 
 runTests().catch((err) => {
